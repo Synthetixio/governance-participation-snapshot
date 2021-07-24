@@ -1,8 +1,7 @@
 'use strict';
 
 const util = require('util');
-const axios = require('axios');
-const { ethers } = require('ethers');
+const { ethers, BigNumber } = require('ethers');
 const UniswapERC20 = require('./contracts/UniswapERC20');
 
 require('dotenv').config();
@@ -10,14 +9,6 @@ require('dotenv').config();
 global.fetch = require('node-fetch');
 
 // const archiveNode = new ethers.providers.InfuraProvider('mainnet', process.env.INFURA_ARCHIVE_KEY);
-
-// const ambassadorDAO = '0x46abFE1C972fCa43766d6aD70E1c1Df72F4Bb4d1';
-// const ambassadorDAO = '0x1aa7c2a1e6e0c4981d77b96ab985b161bb7729b9';
-const ambassadorDAO = '0x8962285fAac45a7CBc75380c484523Bb7c32d429';
-
-const startBlock = undefined;
-
-const endBlock = undefined;
 
 const {
 	Wallet,
@@ -56,6 +47,14 @@ const main = async () => {
 	// let mnemonicWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC);
 
 	const delegatesObject = {};
+
+	const ambassadorDAO = '0x8962285fAac45a7CBc75380c484523Bb7c32d429';
+
+	const startBlock = undefined;
+
+	const endBlock = undefined;
+
+	const totalRewards = 32000;
 
 	const provider = getProvider();
 
@@ -100,6 +99,7 @@ const main = async () => {
 	for (let i = 0; i < allDelegationEvents.length; i++) {
 		const eventAtIndex = allDelegationEvents[i];
 		const { delegator } = eventAtIndex.args;
+		const { blockNumber } = eventAtIndex;
 
 		const checkSummedAddress = ethers.utils.getAddress(delegator);
 
@@ -122,7 +122,16 @@ const main = async () => {
 				totalDelegationAdded = totalDelegationAdded.add(differenceInBalance);
 
 				if (delegatesObject[checkSummedAddress]) {
+					// Means another delegation event happened, we should check if the user added or removed balance
+					// If they've added more balance maintain the existing blockNumber as they shouldn't be penalised for adding more balance later
+					// If they've remove balance the blockNumber should be updated as they should be treated like a original delegation event
+
 					const newBalance = delegatesObject[checkSummedAddress].additionalBalance.add(differenceInBalance);
+
+					if (newBalance.lt(delegatesObject[checkSummedAddress].additionalBalance)) {
+						delegatesObject[checkSummedAddress].blockNumber = blockNumber;
+					}
+
 					delegatesObject[checkSummedAddress].additionalBalance = newBalance;
 					delegatesObject[checkSummedAddress].additionalBalanceString = newBalance.toString();
 				} else {
@@ -130,6 +139,7 @@ const main = async () => {
 						address: checkSummedAddress,
 						additionalBalance: differenceInBalance,
 						additionalBalanceString: differenceInBalance.toString(),
+						blockNumber,
 					};
 				}
 			}
@@ -138,6 +148,20 @@ const main = async () => {
 
 	/*
 		Map values to readable format
+	*/
+
+	/*
+		Values needed
+
+		{
+			address: 0x,
+			proportion: 0.03 (their balance/total delegation)
+			timePenalty: 0.10 (
+				(endBlock - entryBlock) /
+				endBlock - startBlock
+			)
+			entitledRewards: 2000 (maxRewards * (proportion * penalty))
+		}
 	*/
 
 	console.log(util.inspect(delegatesObject, false, null, true /* enable colors */));
