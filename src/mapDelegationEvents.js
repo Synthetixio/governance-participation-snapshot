@@ -1,14 +1,7 @@
 const { ethers } = require('ethers');
 const UniswapERC20 = require('../contracts/UniswapERC20');
 
-async function mapDelegationEvents(
-	events,
-	delegateVotesChangedTopic,
-	startBlock,
-	endBlock,
-	totalRewards,
-	ambassadorDAO,
-) {
+async function mapDelegationEvents(events, startBlock, endBlock, totalRewards, ambassadorDAO) {
 	const ZeroBigNumber = ethers.BigNumber.from('0');
 	const sortedDelegators = [];
 	const rewardsPerBlock = ethers.utils.parseEther((totalRewards / (endBlock - startBlock)).toString());
@@ -27,11 +20,16 @@ async function mapDelegationEvents(
 
 		const iface = new ethers.utils.Interface(UniswapERC20.abi);
 
+		const delegateVotesChangedTopic = iface.getEventTopic('DelegateVotesChanged');
+
 		const proRataRewardsForBlocks = shareOfPool => {
-			return shareOfPool
-				.div(totalSupply)
-				.mul(rewardsPerBlock)
-				.mul(nextBlockNumber - blockNumber);
+			return ethers.BigNumber.from(
+				Math.floor(
+					(Number(ethers.utils.formatEther(shareOfPool)) / Number(ethers.utils.formatEther(totalSupply))) *
+						Number(ethers.utils.formatEther(rewardsPerBlock)) *
+						(nextBlockNumber - blockNumber),
+				),
+			);
 		};
 
 		let nextBlockNumber;
@@ -58,7 +56,7 @@ async function mapDelegationEvents(
 				log.topics[0] === delegateVotesChangedTopic &&
 				ethers.utils.getAddress(ethers.utils.hexStripZeros(log.topics[1])) === ethers.utils.getAddress(ambassadorDAO)
 			) {
-				const data = iface.decodeEventLog('DelegateVotesChanged', log.data);
+				const data = iface.decodeEventLog('DelegateVotesChanged', log.data, log.topics);
 				const previousBalance = ethers.BigNumber.from(data.previousBalance);
 				const newBalance = ethers.BigNumber.from(data.newBalance);
 				const differenceInTotalSupply = newBalance.sub(previousBalance);
@@ -116,6 +114,7 @@ async function mapDelegationEvents(
 							mappedDelegatesObject[element].allocatedRewards = updatedAllocation;
 							mappedDelegatesObject[element].allocatedRewardsString = updatedAllocation.toString();
 						});
+
 						sortedDelegators.push(checkSummedAddress);
 					}
 				}

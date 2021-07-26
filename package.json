@@ -6,6 +6,7 @@
 	"dependencies": {
 		"@snapshot-labs/snapshot.js": "0.1.10",
 		"axios": "0.21.1",
+		"bignumber.js": "^9.0.1",
 		"cross-fetch": "^3.1.0",
 		"dotenv": "^8.2.0",
 		"ethers": "5.0.8",
@@ -20,7 +21,7 @@
 		"jest": "27.0.6"
 	},
 	"scripts": {
-		"test": "jest",
+		"test": "jest --watch",
 		"lint": "eslint .",
 		"format": "prettier --write '**/*.js' '**/*.md'"
 	},

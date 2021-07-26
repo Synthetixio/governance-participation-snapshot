@@ -42,9 +42,9 @@ const main = async () => {
 	// let mnemonicWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC);
 
 	// const ambassadorDAO = '0x8962285fAac45a7CBc75380c484523Bb7c32d429';
-	const ambassadorDAO = '0x7064d1fa592fa9d50c06c6e1a3f79399f12cfaf3';
+	const ambassadorDAO = '0xA2BF1B0a7E079767B4701b5a1D9D5700eB42D1d1';
 
-	const startBlock = 12855422;
+	const startBlock = 10861674;
 
 	const endBlock = 12888159;
 
@@ -84,15 +84,12 @@ const main = async () => {
 		endBlock,
 	);
 
-	const delegateVotesChangedTopic = contract.filters.DelegateVotesChanged().topics[0];
-
 	const allDelegationEvents = delegateChangedToAmbassadorEvents
 		.concat(delegateChangedFromAmbassadorEvents)
 		.sort((a, b) => a.blockNumber - b.blockNumber);
 
 	let delegatesObject = await mapDelegationEvents(
 		allDelegationEvents,
-		delegateVotesChangedTopic,
 		startBlock,
 		endBlock,
 		totalRewards,
@@ -104,7 +101,7 @@ const main = async () => {
 
 main()
 	.then(response => {
-		console.log(util.inspect(response, false, null, true /* enable colors */));
+		// console.log(util.inspect(response, false, null, true /* enable colors */));
 		process.exit(0);
 	})
 	.catch(error => {
