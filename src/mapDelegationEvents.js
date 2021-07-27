@@ -1,23 +1,29 @@
 const { ethers } = require('ethers');
 const UniswapERC20 = require('../contracts/UniswapERC20');
 
-async function mapDelegationEvents(events, startBlock, endBlock, totalRewards, ambassadorDAO) {
-	const ZeroBigNumber = ethers.BigNumber.from('0');
+const mapDelegationEvents = async (events, startBlock, endBlock, totalRewards, ambassadorDAO) => {
 	const sortedDelegators = [];
 	const mappedDelegatesObject = {};
 
+	let totalSupply = 0;
+	let nextBlockNumber;
+	let currentBlockNumber;
+	let remainingRewards = totalRewards;
+
 	const rewardsPerBlock = (currentEndBlock, currentStartBlock) => {
-		return ethers.utils.parseEther((totalRewards / (currentEndBlock - currentStartBlock)).toString());
+		return remainingRewards / (currentEndBlock - currentStartBlock);
+	};
+
+	const proRataRewardsForBlocks = shareOfPool => {
+		return (shareOfPool / totalSupply) * currentRewardsPerBlock * (nextBlockNumber - currentBlockNumber);
 	};
 
 	let currentRewardsPerBlock = rewardsPerBlock(endBlock, startBlock);
 
-	let totalSupply = ZeroBigNumber;
-
 	for (let i = 0; i < events.length; i++) {
 		const eventAtIndex = events[i];
 		const { delegator } = eventAtIndex.args;
-		const { blockNumber } = eventAtIndex;
+		currentBlockNumber = eventAtIndex.blockNumber;
 
 		const checkSummedAddress = ethers.utils.getAddress(delegator);
 
@@ -27,17 +33,6 @@ async function mapDelegationEvents(events, startBlock, endBlock, totalRewards, a
 
 		const delegateVotesChangedTopic = iface.getEventTopic('DelegateVotesChanged');
 
-		const proRataRewardsForBlocks = shareOfPool => {
-			return ethers.BigNumber.from(
-				Math.floor(
-					(Number(ethers.utils.formatEther(shareOfPool)) / Number(ethers.utils.formatEther(totalSupply))) *
-						Number(ethers.utils.formatEther(currentRewardsPerBlock)) *
-						(nextBlockNumber - blockNumber),
-				),
-			);
-		};
-
-		let nextBlockNumber;
 		if (i + 1 < events.length) {
 			nextBlockNumber = events[i + 1].blockNumber;
 		} else {
@@ -45,13 +40,10 @@ async function mapDelegationEvents(events, startBlock, endBlock, totalRewards, a
 		}
 
 		if (events.length === 1) {
-			const totalRewardsBN = ethers.utils.parseEther(totalRewards.toString());
 			mappedDelegatesObject[checkSummedAddress] = {
 				address: checkSummedAddress,
-				allocatedRewards: totalRewardsBN,
-				allocatedRewardsString: totalRewardsBN.toString(),
-				totalContribution: ZeroBigNumber,
-				totalContributionString: ZeroBigNumber.toString(),
+				allocatedRewards: totalRewards,
+				totalContribution: 0,
 			};
 			break;
 		}
@@ -62,64 +54,71 @@ async function mapDelegationEvents(events, startBlock, endBlock, totalRewards, a
 				ethers.utils.getAddress(ethers.utils.hexStripZeros(log.topics[1])) === ethers.utils.getAddress(ambassadorDAO)
 			) {
 				const data = iface.decodeEventLog('DelegateVotesChanged', log.data, log.topics);
-				const previousBalance = ethers.BigNumber.from(data.previousBalance);
-				const newBalance = ethers.BigNumber.from(data.newBalance);
-				const differenceInTotalSupply = newBalance.sub(previousBalance);
-				totalSupply = totalSupply.add(differenceInTotalSupply);
 
-				if (!differenceInTotalSupply.eq(ZeroBigNumber)) {
+				const previousBalance = Number(ethers.utils.formatEther(data.previousBalance));
+				const newBalance = Number(ethers.utils.formatEther(data.newBalance));
+				const differenceInTotalSupply = newBalance - previousBalance;
+				totalSupply = totalSupply + differenceInTotalSupply;
+
+				if (differenceInTotalSupply !== 0) {
 					// We recognise delegation events from already tracked delegators
 					if (mappedDelegatesObject[checkSummedAddress]) {
-						const newBalance = mappedDelegatesObject[checkSummedAddress].totalContribution.add(differenceInTotalSupply);
+						const newBalance = mappedDelegatesObject[checkSummedAddress].totalContribution + differenceInTotalSupply;
 
-						// Slash them if they're contribution reaches zero, rewardsPerBlock should also shift
-						if (newBalance.lte(ZeroBigNumber)) {
-							currentRewardsPerBlock = rewardsPerBlock(endBlock, blockNumber);
+						// Slash them if they're contribution reaches zero, rewardsPerBlock and remaining rewards should shift
+						if (newBalance <= 0) {
+							remainingRewards += mappedDelegatesObject[checkSummedAddress].allocatedRewards;
+
+							currentRewardsPerBlock = rewardsPerBlock(endBlock, currentBlockNumber);
 
 							mappedDelegatesObject[checkSummedAddress] = {
 								...mappedDelegatesObject[checkSummedAddress],
-								allocatedRewards: ZeroBigNumber,
-								allocatedRewardsString: ZeroBigNumber.toString(),
-								totalContribution: ZeroBigNumber,
-								totalContributionString: ZeroBigNumber.toString(),
+								allocatedRewards: 0,
+								totalContribution: 0,
 							};
 						} else {
-							const updatedAllocation = mappedDelegatesObject[checkSummedAddress].allocatedRewards.add(
-								proRataRewardsForBlocks(differenceInTotalSupply),
-							);
+							const updatedAllocation =
+								mappedDelegatesObject[checkSummedAddress].allocatedRewards +
+								proRataRewardsForBlocks(differenceInTotalSupply);
+
+							remainingRewards -= proRataRewardsForBlocks(differenceInTotalSupply);
+
 							mappedDelegatesObject[checkSummedAddress] = {
 								...mappedDelegatesObject[checkSummedAddress],
 								allocatedRewards: updatedAllocation,
-								allocatedRewardsString: updatedAllocation.toString(),
 								totalContribution: newBalance,
-								totalContributionString: newBalance.toString(),
 							};
 						}
 
+						// Any delegate before the delegation event must be recalculated with the new block rewards
 						sortedDelegators.forEach(element => {
 							if (ethers.utils.getAddress(element) !== checkSummedAddress) {
-								const updatedAllocation = mappedDelegatesObject[element].allocatedRewards.add(
-									proRataRewardsForBlocks(mappedDelegatesObject[element].totalContribution),
-								);
+								const updatedAllocation =
+									mappedDelegatesObject[element].allocatedRewards +
+									proRataRewardsForBlocks(mappedDelegatesObject[element].totalContribution);
+
+								remainingRewards -= proRataRewardsForBlocks(mappedDelegatesObject[element].totalContribution);
+
 								mappedDelegatesObject[element].allocatedRewards = updatedAllocation;
-								mappedDelegatesObject[element].allocatedRewardsString = updatedAllocation.toString();
 							}
 						});
 					} else {
 						mappedDelegatesObject[checkSummedAddress] = {
 							address: checkSummedAddress,
 							allocatedRewards: proRataRewardsForBlocks(differenceInTotalSupply),
-							allocatedRewardsString: proRataRewardsForBlocks(differenceInTotalSupply).toString(),
 							totalContribution: differenceInTotalSupply,
-							totalContributionString: differenceInTotalSupply.toString(),
 						};
 
+						remainingRewards -= proRataRewardsForBlocks(differenceInTotalSupply);
+
 						sortedDelegators.forEach(element => {
-							const updatedAllocation = mappedDelegatesObject[element].allocatedRewards.add(
-								proRataRewardsForBlocks(mappedDelegatesObject[element].totalContribution),
-							);
+							const updatedAllocation =
+								mappedDelegatesObject[element].allocatedRewards +
+								proRataRewardsForBlocks(mappedDelegatesObject[element].totalContribution);
+
+							remainingRewards -= proRataRewardsForBlocks(mappedDelegatesObject[element].totalContribution);
+
 							mappedDelegatesObject[element].allocatedRewards = updatedAllocation;
-							mappedDelegatesObject[element].allocatedRewardsString = updatedAllocation.toString();
 						});
 
 						sortedDelegators.push(checkSummedAddress);
@@ -129,6 +128,6 @@ async function mapDelegationEvents(events, startBlock, endBlock, totalRewards, a
 		});
 	}
 	return mappedDelegatesObject;
-}
+};
 
 module.exports = mapDelegationEvents;

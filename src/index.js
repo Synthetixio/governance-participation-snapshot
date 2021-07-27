@@ -1,7 +1,7 @@
 const util = require('util');
 const { ethers } = require('ethers');
 const UniswapERC20 = require('../contracts/UniswapERC20');
-const mapDelegationEvents = require('./mapDelegationEvents.js');
+const mapDelegationEvents = require('./mapDelegationEvents');
 
 require('dotenv').config();
 
