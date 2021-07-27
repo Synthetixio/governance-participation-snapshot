@@ -4,8 +4,13 @@ const UniswapERC20 = require('../contracts/UniswapERC20');
 async function mapDelegationEvents(events, startBlock, endBlock, totalRewards, ambassadorDAO) {
 	const ZeroBigNumber = ethers.BigNumber.from('0');
 	const sortedDelegators = [];
-	const rewardsPerBlock = ethers.utils.parseEther((totalRewards / (endBlock - startBlock)).toString());
 	const mappedDelegatesObject = {};
+
+	const rewardsPerBlock = (currentEndBlock, currentStartBlock) => {
+		return ethers.utils.parseEther((totalRewards / (currentEndBlock - currentStartBlock)).toString());
+	};
+
+	let currentRewardsPerBlock = rewardsPerBlock(endBlock, startBlock);
 
 	let totalSupply = ZeroBigNumber;
 
@@ -26,7 +31,7 @@ async function mapDelegationEvents(events, startBlock, endBlock, totalRewards, a
 			return ethers.BigNumber.from(
 				Math.floor(
 					(Number(ethers.utils.formatEther(shareOfPool)) / Number(ethers.utils.formatEther(totalSupply))) *
-						Number(ethers.utils.formatEther(rewardsPerBlock)) *
+						Number(ethers.utils.formatEther(currentRewardsPerBlock)) *
 						(nextBlockNumber - blockNumber),
 				),
 			);
@@ -67,8 +72,10 @@ async function mapDelegationEvents(events, startBlock, endBlock, totalRewards, a
 					if (mappedDelegatesObject[checkSummedAddress]) {
 						const newBalance = mappedDelegatesObject[checkSummedAddress].totalContribution.add(differenceInTotalSupply);
 
-						// Slash them if they're contribution reaches zero
+						// Slash them if they're contribution reaches zero, rewardsPerBlock should also shift
 						if (newBalance.lte(ZeroBigNumber)) {
+							currentRewardsPerBlock = rewardsPerBlock(endBlock, blockNumber);
+
 							mappedDelegatesObject[checkSummedAddress] = {
 								...mappedDelegatesObject[checkSummedAddress],
 								allocatedRewards: ZeroBigNumber,
