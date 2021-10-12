@@ -1,5 +1,5 @@
 const { ethers } = require('ethers');
-const UniswapERC20 = require('../contracts/UniswapERC20');
+const UniswapERC20 = require('../abis/UniswapERC20');
 const mapDelegationEvents = require('../src/mapDelegationEvents');
 
 const getTransactionReceipt = async (ambassadorDAO, previousBalance, newBalance, blockNumber) => {

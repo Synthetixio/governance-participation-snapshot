@@ -1,7 +1,10 @@
 const util = require('util');
 const { ethers } = require('ethers');
-const UniswapERC20 = require('../contracts/UniswapERC20');
+const UniswapERC20 = require('../abis/UniswapERC20');
 const mapDelegationEvents = require('./mapDelegationEvents');
+// const { parse } = require('json2csv');
+const fs = require('fs');
+const ObjectsToCsv = require('objects-to-csv');
 
 require('dotenv').config();
 
@@ -41,12 +44,15 @@ const main = async () => {
 
 	// let mnemonicWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC);
 
-	// const ambassadorDAO = '0x8962285fAac45a7CBc75380c484523Bb7c32d429';
-	const ambassadorDAO = '0xA2BF1B0a7E079767B4701b5a1D9D5700eB42D1d1';
+	const ambassadorDAO = '0x46abFE1C972fCa43766d6aD70E1c1Df72F4Bb4d1';
+	// @TODO: change
+	// const ambassadorDAO = '0xA2BF1B0a7E079767B4701b5a1D9D5700eB42D1d1';
 
-	const startBlock = 10861674;
+	// @TODO: check that this start block is correct
+	const startBlock = 13215121;
 
-	const endBlock = 12888159;
+	// @TODO: change to proper end date
+	const endBlock = 13215429;
 
 	const totalRewards = 32000;
 
@@ -95,6 +101,13 @@ const main = async () => {
 		totalRewards,
 		ambassadorDAO,
 	);
+
+	try {
+		const csv = new ObjectsToCsv(Object.values(delegatesObject));
+		await csv.toDisk('./src/delegates.csv');
+	} catch (err) {
+		console.error(err);
+	}
 
 	return delegatesObject;
 };

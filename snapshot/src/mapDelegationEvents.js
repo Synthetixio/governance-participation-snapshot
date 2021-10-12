@@ -1,5 +1,5 @@
 const { ethers } = require('ethers');
-const UniswapERC20 = require('../contracts/UniswapERC20');
+const UniswapERC20 = require('../abis/UniswapERC20');
 
 const mapDelegationEvents = async (events, startBlock, endBlock, totalRewards, ambassadorDAO) => {
 	const sortedDelegators = [];
@@ -31,8 +31,6 @@ const mapDelegationEvents = async (events, startBlock, endBlock, totalRewards, a
 
 		const iface = new ethers.utils.Interface(UniswapERC20.abi);
 
-		const delegateVotesChangedTopic = iface.getEventTopic('DelegateVotesChanged');
-
 		if (i + 1 < events.length) {
 			nextBlockNumber = events[i + 1].blockNumber;
 		} else {
@@ -49,14 +47,21 @@ const mapDelegationEvents = async (events, startBlock, endBlock, totalRewards, a
 		}
 
 		receipt.logs.forEach(log => {
-			if (
-				log.topics[0] === delegateVotesChangedTopic &&
-				ethers.utils.getAddress(ethers.utils.hexStripZeros(log.topics[1])) === ethers.utils.getAddress(ambassadorDAO)
-			) {
-				const data = iface.decodeEventLog('DelegateVotesChanged', log.data, log.topics);
+			let parsedLog;
 
-				const previousBalance = Number(ethers.utils.formatEther(data.previousBalance));
-				const newBalance = Number(ethers.utils.formatEther(data.newBalance));
+			try {
+				parsedLog = iface.parseLog(log);
+			} catch (e) {
+				console.log(e);
+				return;
+			}
+
+			if (
+				parsedLog.name === 'DelegateVotesChanged' &&
+				ethers.utils.getAddress(parsedLog.args['delegate']) === ethers.utils.getAddress(ambassadorDAO)
+			) {
+				const previousBalance = Number(ethers.utils.formatEther(parsedLog.args['previousBalance']));
+				const newBalance = Number(ethers.utils.formatEther(parsedLog.args['newBalance']));
 				const differenceInTotalSupply = newBalance - previousBalance;
 				totalSupply = totalSupply + differenceInTotalSupply;
 

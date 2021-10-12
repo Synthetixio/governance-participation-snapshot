@@ -1,0 +1,42 @@
+{
+	"name": "merkle-claim",
+	"version": "1.0.0",
+	"description": "Generate and verify Merkle Tree for scalable token claiming",
+	"main": ".",
+	"scripts": {
+		"csv-to-json": "python scripts/csv_to_json.py ./mainnet-artifacts/delegations.csv ./mainnet-artifacts/merkle-input",
+		"generate-hash": "ts-node scripts/generate-merkle-root.ts --input ./mainnet-artifacts/merkle-input.json >> ./mainnet-artifacts/merkle-output.json",
+		"generate-example-hash": "ts-node scripts/generate-merkle-root.ts --input ./mainnet-artifacts/example.json >> ./mainnet-artifacts/example-output.json",
+		"verify-hash": "ts-node scripts/verify-merkle-root.ts --input ./mainnet-artifacts/merkle-output.json",
+		"verify-example-hash": "ts-node scripts/verify-merkle-root.ts --input ./mainnet-artifacts/example-output.json",
+		"kovan-deploy": "npx hardhat run scripts/deployment.js --network kovan",
+		"kovan-verify": "npx hardhat verify --network kovan 0xc0a6b43ceee6a64818b50b5fff0e6552d7ec95d4 '0xD4Dd877687CE03aaf25AfAf842F0b0ef8A740A28' '0x3b8527caf1b37d9dbb46c094e757a3f5b9e396b0726bbd9196dc3f45776819e8'"
+	},
+	"dependencies": {
+		"@openzeppelin/contracts": "4.3.2",
+		"bignumber.js": "8.0.1",
+		"commander": "^6.1.0",
+		"dotenv": "^8.2.0",
+		"ethereumjs-util": "^7.0.4",
+		"prettier": "^2.0.5",
+		"standard": "^12.0.1",
+		"ts-node": "^8.5.4",
+		"typescript": "^3.7.3"
+	},
+	"devDependencies": {
+		"@nomiclabs/hardhat-ethers": "^2.0.2",
+		"@nomiclabs/hardhat-etherscan": "^2.1.1",
+		"@nomiclabs/hardhat-solhint": "2.0.0",
+		"@nomiclabs/hardhat-waffle": "^2.0.1",
+		"chai": "^4.3.4",
+		"ethereum-waffle": "^3.3.0",
+		"ethers": "^5.0.32",
+		"hardhat": "^2.1.2"
+	},
+	"files": [
+		"build"
+	],
+	"engines": {
+		"node": ">=10"
+	}
+}

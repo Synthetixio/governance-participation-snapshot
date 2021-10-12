@@ -1,5 +1,6 @@
-# JS Template
+# Merkle Tree Retroactive Rewards
 
-Start a new project using me as a template!
+A repo containing the tools needed for running a retroactive Merkle Tree claim program.
 
-Run `npm init` to name and configure.
+snapshot/ - contains the script to fetch data using events
+merkle-tree/ - contains the tools needed to create a Merkle Tree and the contract to host it
