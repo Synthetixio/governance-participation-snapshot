@@ -2,7 +2,6 @@ const util = require('util');
 const { ethers } = require('ethers');
 const UniswapERC20 = require('../abis/UniswapERC20');
 const mapDelegationEvents = require('./mapDelegationEvents');
-// const { parse } = require('json2csv');
 const fs = require('fs');
 const ObjectsToCsv = require('objects-to-csv');
 
